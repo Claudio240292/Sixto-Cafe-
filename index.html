@@ -604,6 +604,7 @@ function enviarPorMailto(){
 document.getElementById('sendBtn').addEventListener('click', ()=>{
   const sendBtn = document.getElementById('sendBtn');
   if(!window.emailjs){
+    alert('DEBUG - El script de EmailJS no cargó en esta página (revisa tu conexión o si algo lo está bloqueando). Toma captura de esto y mándasela a Claude. Al aceptar, se abrirá tu correo como respaldo.');
     showToast('EmailJS no cargó (revisa tu conexión), abriendo tu correo...');
     enviarPorMailto();
     return;
@@ -620,7 +621,10 @@ document.getElementById('sendBtn').addEventListener('click', ()=>{
     sendBtn.disabled = false;
   }).catch((err)=>{
     console.error('EmailJS error', err);
-    const motivo = (err && (err.text || err.message)) ? (err.text || err.message) : 'error desconocido';
+    let motivo = 'error desconocido';
+    try{ motivo = JSON.stringify(err); }catch(e){}
+    if(err && (err.text || err.message)) motivo = (err.status ? `status ${err.status}: ` : '') + (err.text || err.message);
+    alert('DEBUG - EmailJS no pudo enviar:\n\n' + motivo + '\n\nToma captura de esto y mándasela a Claude. Al aceptar, se abrirá tu correo como respaldo.');
     showToast(`No se pudo enviar (${motivo}), abriendo tu correo...`);
     sendBtn.textContent = textoOriginal;
     sendBtn.disabled = false;
