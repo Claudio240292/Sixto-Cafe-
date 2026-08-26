@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Sixto Café · Pedido de compras</title>
+<style>
+  :root{
+    --cream:#FBF6EE;
+    --cream-2:#F3E7DE;
+    --ink:#2A1416;
+    --ink-soft:#7A5C5E;
+    --red:#B5262B;
+    --red-dark:#7C1E22;
+    --red-light:#D9534F;
+    --line:#EAD9D6;
+    --white:#FFFFFF;
+    --shadow: 0 4px 16px rgba(42,20,22,0.14);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--cream);
+    color:var(--ink);
+    font-family: "Georgia", "Times New Roman", serif;
+    padding-bottom:96px;
+    -webkit-font-smoothing:antialiased;
+  }
+  header{
+    background:linear-gradient(135deg, var(--red-dark), var(--red));
+    color:#fff;
+    padding:22px 18px 20px;
+    position:sticky; top:0; z-index:20;
+    box-shadow:var(--shadow);
+  }
+  header h1{margin:0; font-size:1.35rem; letter-spacing:.2px; font-family:"Verdana", "Geneva", sans-serif; font-weight:bold;}
+  header p{margin:4px 0 0; font-size:.85rem; opacity:.9;}
+
+  .toolbar{
+    background:var(--cream);
+    position:sticky; top:70px; z-index:19;
+    padding:12px 14px 10px;
+    border-bottom:1px solid var(--line);
+  }
+  header + .toolbar{top:74px;}
+
+  .search{
+    display:flex; align-items:center; gap:8px;
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:9px 12px;
+  }
+  .search input{
+    border:none; outline:none; flex:1;
+    font-size:.95rem; background:transparent; color:var(--ink);
+  }
+  .search svg{flex-shrink:0; opacity:.55; color:var(--ink-soft);}
+
+  main{padding:14px;}
+
+  .product-list{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:14px;
+    overflow:hidden;
+  }
+
+  .item{
+    display:flex; align-items:center; gap:10px;
+    padding:11px 12px;
+    border-bottom:1px solid var(--line);
+  }
+  .item:last-child{border-bottom:none;}
+  .item input[type=checkbox]{
+    width:20px; height:20px; accent-color:var(--red); flex-shrink:0; cursor:pointer;
+  }
+  .item label{flex:1; font-size:.92rem; cursor:pointer; line-height:1.5;}
+  .item .prov-tag{
+    display:inline-block;
+    font-size:.7rem; font-weight:600; color:var(--red-dark); background:var(--cream-2);
+    border-radius:6px; padding:2px 7px; margin-left:6px; vertical-align:middle;
+  }
+  .item .cat-tag{
+    font-size:.68rem; color:var(--ink-soft); background:var(--cream);
+    border:1px solid var(--line);
+    border-radius:6px; padding:1px 6px; margin-left:4px; vertical-align:middle;
+  }
+  .item .note{
+    width:0; opacity:0; border:1px solid var(--line); border-radius:8px;
+    padding:0 8px; font-size:.8rem; transition:.15s; height:32px;
+  }
+  .item.checked{background:#FBEDEA;}
+  .item.checked .note{width:110px; opacity:1; padding:0 8px;}
+
+  .empty-msg{padding:20px; text-align:center; color:var(--ink-soft); font-size:.9rem;}
+
+  .bottombar{
+    position:fixed; bottom:0; left:0; right:0; z-index:30;
+    background:var(--red-dark); color:#fff;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 16px; box-shadow:0 -4px 16px rgba(0,0,0,.18);
+  }
+  .bottombar .count{font-size:.9rem;}
+  .bottombar .count b{font-size:1.1rem;}
+  .bottombar button{
+    background:var(--red); color:#fff; border:none;
+    padding:11px 20px; border-radius:10px; font-weight:700; font-size:.92rem;
+    cursor:pointer;
+  }
+  .bottombar button:disabled{opacity:.4;}
+
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(42,20,22,.55); z-index:40;
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .modal-overlay.open{display:flex;}
+  .modal{
+    background:var(--cream); width:100%; max-width:560px;
+    border-radius:18px 18px 0 0; max-height:85vh; overflow-y:auto;
+    padding:18px 18px 22px;
+  }
+  .modal h2{margin:0 0 4px; font-size:1.1rem; color:var(--red-dark);}
+  .modal .sub{font-size:.78rem; color:var(--ink-soft); margin-bottom:14px;}
+  .modal .sup-block{margin-bottom:14px;}
+  .modal .sup-block h4{
+    margin:0 0 6px; font-size:.85rem; color:var(--red-dark);
+    border-bottom:1px solid var(--line); padding-bottom:4px;
+  }
+  .modal .sup-block ul{margin:0; padding-left:18px; font-size:.88rem;}
+  .modal .sup-block li{margin-bottom:3px;}
+  .modal-actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;}
+  .modal-actions button{
+    flex:1; min-width:120px; padding:11px; border-radius:10px; border:none;
+    font-weight:600; font-size:.88rem; cursor:pointer;
+  }
+  .btn-send{background:var(--red); color:#fff;}
+  .btn-print{background:var(--white); color:var(--ink); border:1px solid var(--line) !important;}
+  .btn-clear{background:transparent; color:var(--ink-soft); border:1px solid var(--line) !important;}
+  .btn-close{
+    position:absolute; top:14px; right:16px; background:none; border:none;
+    font-size:1.3rem; color:var(--ink-soft); cursor:pointer;
+  }
+  .modal-wrap{position:relative;}
+  .toast{
+    position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+    background:var(--ink); color:#fff; padding:9px 16px; border-radius:999px;
+    font-size:.85rem; z-index:60; opacity:0; pointer-events:none; transition:.25s;
+  }
+  .toast.show{opacity:1;}
+
+  #printArea{display:none;}
+  @media print{
+    body *{visibility:hidden;}
+    #printArea, #printArea *{visibility:visible;}
+    #printArea{
+      display:block; position:absolute; top:0; left:0; width:100%;
+      padding:20px; color:#000;
+    }
+    #printArea h2{margin-bottom:4px;}
+    #printArea h4{margin:14px 0 4px; border-bottom:1px solid #999; padding-bottom:2px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Sixto Café</h1>
+  <p>Lista de pedidos — selecciona lo que falta y arma tu lista de compras</p>
+</header>
+
+<div class="toolbar">
+  <div class="search">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" id="searchInput" placeholder="Buscar producto...">
+  </div>
+</div>
+
+<main>
+  <div id="productContainer"></div>
+</main>
+
+<div class="bottombar">
+  <div class="count"><b id="selCount">0</b> artículos seleccionados</div>
+  <button id="verPedidoBtn" disabled>Ver pedido</button>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-wrap">
+      <button class="btn-close" id="closeModal">✕</button>
+      <h2>📋 Pedido Sixto Café</h2>
+      <div class="sub" id="modalDate"></div>
+      <div id="modalContent"></div>
+      <div class="modal-actions">
+        <button class="btn-send" id="sendBtn">Enviar pedido</button>
+        <button class="btn-print" id="printBtn">Imprimir</button>
+        <button class="btn-clear" id="clearBtn">Limpiar selección</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="printArea"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const CATALOGO = [
+  {
+    "producto": "Azucar Mascabada bolsa",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Canela",
+    "proveedor": "Sam's Club",
+    "categoria": "Todo"
+  },
+  {
+    "producto": "Chispas de chocolate",
+    "proveedor": "Mercado Gourmet Polanco",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Chispas de chocolate blanco",
+    "proveedor": "Mercado Gourmet Polanco",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Champinones",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Frijoles",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Crutones",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Cloro",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Pinol",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Crema",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Queso",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Queso Bagel",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Pan Toast",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Pan Frances",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Pan Bagels",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Croissant",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Aderezos",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Jamon",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Tocino",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Papas",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Mermelada",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Crema de cacahuate",
+    "proveedor": "Sam's Club",
+    "categoria": "Barra"
+  },
+  {
+    "producto": "Sobres azúcar",
+    "proveedor": "Sam's Club",
+    "categoria": "Barra"
+  },
+  {
+    "producto": "Sobres azúcar mascabada",
+    "proveedor": "Mercado Libre",
+    "categoria": "Barra"
+  },
+  {
+    "producto": "Sobres splenda",
+    "proveedor": "Sam's Club",
+    "categoria": "Barra"
+  },
+  {
+    "producto": "Sobres stevia",
+    "proveedor": "Sam's Club",
+    "categoria": "Barra"
+  },
+  {
+    "producto": "Crema lottus",
+    "proveedor": "Amazon",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Coca Cola",
+    "proveedor": "Bodega Aurrera",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Agua Mineral",
+    "proveedor": "Bodega Aurrera",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Agua Tónica",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Helado Vainilla",
+    "proveedor": "Sam's Club",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Cerveza Modelo Especial",
+    "proveedor": "Grupo Modelo",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Cerveza Negra Modelo",
+    "proveedor": "Grupo Modelo",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Cerveza Allende",
+    "proveedor": "Cervecería Allende",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Cerveza Ultra",
+    "proveedor": "Grupo Modelo",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Vasos de carton 12 oz",
+    "proveedor": "Otro",
+    "categoria": "Barra"
+  },
+  {
+    "producto": "Vasos de carton 8 oz",
+    "proveedor": "Otro",
+    "categoria": "Barra"
+  },
+  {
+    "producto": "Mangas de carton",
+    "proveedor": "Entelequia",
+    "categoria": "Barra"
+  },
+  {
+    "producto": "Platos para llevar",
+    "proveedor": "Entelequia",
+    "categoria": "Cocina"
+  },
+  {
+    "producto": "Servilletas",
+    "proveedor": "Sam's Club",
+    "categoria": "Todo"
+  },
+  {
+    "producto": "Papel de baño",
+    "proveedor": "Sam's Club",
+    "categoria": "Todo"
+  },
+  {
+    "producto": "Té de manzanilla",
+    "proveedor": "Sam's Club",
+    "categoria": "Barra"
+  },
+  {
+    "producto": "Café",
+    "proveedor": "Wilberts",
+    "categoria": "Barra"
+  },
+  {
+    "producto": "Matcha",
+    "proveedor": "Sinensis",
+    "categoria": "Barra"
+  },
+  {
+    "producto": "Hojicha",
+    "proveedor": "Sinensis",
+    "categoria": "Barra"
+  },
+  {
+    "producto": "Pan dulce",
+    "proveedor": "Dominique",
+    "categoria": "Barra"
+  },
+  {
+    "producto": "Leche Entera",
+    "proveedor": "Sam's Club",
+    "categoria": "Barra"
+  },
+  {
+    "producto": "Leche Deslactosada Light",
+    "proveedor": "Sam's Club",
+    "categoria": "Barra"
+  },
+  {
+    "producto": "Leche Avena",
+    "proveedor": "Sam's Club",
+    "categoria": "Barra"
+  },
+  {
+    "producto": "Leche Almendra",
+    "proveedor": "Sam's Club",
+    "categoria": "Barra"
+  }
+];
+const EMAIL_DESTINO = "cjbc6daw@gmail.com";
+
+let searchTerm = "";
+const state = {}; // key: producto -> {checked, nota}
+
+function keyOf(p){ return p.producto.toLowerCase(); }
+function normaliza(s){
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+CATALOGO.forEach(p => state[keyOf(p)] = {checked:false, nota:""});
+
+function renderList(){
+  const el = document.getElementById('productContainer');
+  const items = CATALOGO
+    .filter(p => !searchTerm || normaliza(p.producto).includes(searchTerm))
+    .sort((a,b)=>a.producto.localeCompare(b.producto,'es'));
+
+  if(items.length===0){
+    el.innerHTML = `<div class="empty-msg">No encontré productos con ese nombre.</div>`;
+    return;
+  }
+
+  let html = `<div class="product-list">`;
+  items.forEach(p=>{
+    const k = keyOf(p);
+    const st = state[k];
+    html += `<div class="item ${st.checked?'checked':''}" data-key="${k}">
+      <input type="checkbox" id="chk-${k}" ${st.checked?'checked':''}>
+      <label for="chk-${k}">${p.producto}<span class="prov-tag">🛒 ${p.proveedor}</span>${p.categoria?`<span class="cat-tag">${p.categoria}</span>`:""}</label>
+      <input type="text" class="note" placeholder="cant./nota" value="${st.nota}">
+    </div>`;
+  });
+  html += `</div>`;
+  el.innerHTML = html;
+
+  el.querySelectorAll('.item input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', e=>{
+      const key = e.target.closest('.item').dataset.key;
+      state[key].checked = e.target.checked;
+      e.target.closest('.item').classList.toggle('checked', e.target.checked);
+      updateCount();
+    });
+  });
+  el.querySelectorAll('.item .note').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const key = e.target.closest('.item').dataset.key;
+      state[key].nota = e.target.value;
+    });
+  });
+}
+
+function updateCount(){
+  const n = Object.values(state).filter(s=>s.checked).length;
+  document.getElementById('selCount').textContent = n;
+  document.getElementById('verPedidoBtn').disabled = n===0;
+}
+
+function buildOrderBySupplier(){
+  const bySup = {};
+  CATALOGO.forEach(p=>{
+    const st = state[keyOf(p)];
+    if(!st.checked) return;
+    if(!bySup[p.proveedor]) bySup[p.proveedor] = [];
+    bySup[p.proveedor].push(p.producto + (st.nota ? ` (${st.nota})` : ""));
+  });
+  return bySup;
+}
+
+function fechaHoy(){
+  const d = new Date();
+  return d.toLocaleDateString('es-MX', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+}
+
+function renderModal(){
+  const bySup = buildOrderBySupplier();
+  const provsOrdered = Object.keys(bySup).sort((a,b)=>a.localeCompare(b,'es'));
+  document.getElementById('modalDate').textContent = fechaHoy();
+  let html = "";
+  provsOrdered.forEach(prov=>{
+    html += `<div class="sup-block"><h4>🛒 ${prov}</h4><ul>`;
+    bySup[prov].forEach(name=> html += `<li>${name}</li>`);
+    html += `</ul></div>`;
+  });
+  document.getElementById('modalContent').innerHTML = html || `<p>No hay productos seleccionados.</p>`;
+
+  let printHtml = `<h2>Pedido Sixto Café</h2><div>${fechaHoy()}</div>`;
+  provsOrdered.forEach(prov=>{
+    printHtml += `<h4>${prov}</h4><ul>`;
+    bySup[prov].forEach(name=> printHtml += `<li>${name}</li>`);
+    printHtml += `</ul>`;
+  });
+  document.getElementById('printArea').innerHTML = printHtml;
+}
+
+function textoPlano(){
+  const bySup = buildOrderBySupplier();
+  const provsOrdered = Object.keys(bySup).sort((a,b)=>a.localeCompare(b,'es'));
+  let txt = `Pedido Sixto Café — ${fechaHoy()}\n`;
+  provsOrdered.forEach(prov=>{
+    txt += `\n${prov}\n`;
+    bySup[prov].forEach(name=> txt += `- ${name}\n`);
+  });
+  return txt.trim();
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+document.getElementById('searchInput').addEventListener('input', e=>{
+  searchTerm = e.target.value.trim().toLowerCase();
+  renderList();
+});
+
+document.getElementById('verPedidoBtn').addEventListener('click', ()=>{
+  renderModal();
+  document.getElementById('modalOverlay').classList.add('open');
+});
+document.getElementById('closeModal').addEventListener('click', ()=>{
+  document.getElementById('modalOverlay').classList.remove('open');
+});
+document.getElementById('modalOverlay').addEventListener('click', e=>{
+  if(e.target.id === 'modalOverlay') document.getElementById('modalOverlay').classList.remove('open');
+});
+
+document.getElementById('sendBtn').addEventListener('click', ()=>{
+  const txt = textoPlano();
+  const subject = encodeURIComponent(`Pedido Sixto Café — ${fechaHoy()}`);
+  const body = encodeURIComponent(txt);
+  window.location.href = `mailto:${EMAIL_DESTINO}?subject=${subject}&body=${body}`;
+  showToast('Abriendo tu correo con el pedido listo para enviar...');
+});
+
+document.getElementById('printBtn').addEventListener('click', ()=>{
+  window.print();
+});
+
+document.getElementById('clearBtn').addEventListener('click', ()=>{
+  Object.keys(state).forEach(k=>{ state[k].checked=false; state[k].nota=""; });
+  renderList(); updateCount();
+  document.getElementById('modalOverlay').classList.remove('open');
+  showToast('Selección limpiada');
+});
+
+renderList();
+updateCount();
+</script>
+</body>
+</html>
