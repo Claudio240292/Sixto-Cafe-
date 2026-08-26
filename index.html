@@ -136,7 +136,6 @@
     font-weight:600; font-size:.88rem; cursor:pointer;
   }
   .btn-send{background:var(--red); color:#fff;}
-  .btn-print{background:var(--white); color:var(--ink); border:1px solid var(--line) !important;}
   .btn-clear{background:transparent; color:var(--ink-soft); border:1px solid var(--line) !important;}
   .btn-close{
     position:absolute; top:14px; right:16px; background:none; border:none;
@@ -149,25 +148,13 @@
     font-size:.85rem; z-index:60; opacity:0; pointer-events:none; transition:.25s;
   }
   .toast.show{opacity:1;}
-
-  #printArea{display:none;}
-  @media print{
-    body *{visibility:hidden;}
-    #printArea, #printArea *{visibility:visible;}
-    #printArea{
-      display:block; position:absolute; top:0; left:0; width:100%;
-      padding:20px; color:#000;
-    }
-    #printArea h2{margin-bottom:4px;}
-    #printArea h4{margin:14px 0 4px; border-bottom:1px solid #999; padding-bottom:2px;}
-  }
 </style>
 </head>
 <body>
 
 <header>
   <h1>Sixto Café</h1>
-  <p>Lista de Pedidos</p>
+  <p>Lista de pedidos — selecciona lo que falta y arma tu lista de compras</p>
 </header>
 
 <div class="toolbar">
@@ -195,16 +182,15 @@
       <div id="modalContent"></div>
       <div class="modal-actions">
         <button class="btn-send" id="sendBtn">Enviar pedido</button>
-        <button class="btn-print" id="printBtn">Imprimir</button>
         <button class="btn-clear" id="clearBtn">Limpiar selección</button>
       </div>
     </div>
   </div>
 </div>
 
-<div id="printArea"></div>
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>
 const CATALOGO = [
   {
@@ -460,6 +446,11 @@ const CATALOGO = [
 ];
 const EMAIL_DESTINO = "cjbc6daw@gmail.com";
 
+const EMAILJS_PUBLIC_KEY = "u0_DF_6M_wtCekY_T";
+const EMAILJS_SERVICE_ID = "service_cypkqp2";
+const EMAILJS_TEMPLATE_ID = "template_vpqsj7I";
+if (window.emailjs) { emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY }); }
+
 let searchTerm = "";
 const state = {}; // key: producto -> {checked, nota}
 
@@ -531,6 +522,30 @@ function fechaHoy(){
   return d.toLocaleDateString('es-MX', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
 }
 
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// HTML para el correo (mismos estilos en linea que la plantilla de EmailJS)
+function buildOrderEmailHTML(){
+  const bySup = buildOrderBySupplier();
+  const provsOrdered = Object.keys(bySup).sort((a,b)=>a.localeCompare(b,'es'));
+  if(provsOrdered.length === 0){
+    return `<p>No hay productos seleccionados.</p>`;
+  }
+  let html = "";
+  provsOrdered.forEach(prov=>{
+    html += `<div style="margin-bottom:16px;">
+      <div style="font-family:Verdana,Geneva,sans-serif; font-weight:bold; font-size:14px; color:#B5262B; border-bottom:1px solid #EAD9D6; padding-bottom:4px; margin-bottom:6px;">${escapeHtml(prov)}</div>
+      <ul style="margin:0; padding-left:20px;">`;
+    bySup[prov].forEach(name=>{
+      html += `<li style="margin-bottom:4px;">${escapeHtml(name)}</li>`;
+    });
+    html += `</ul></div>`;
+  });
+  return html;
+}
+
 function renderModal(){
   const bySup = buildOrderBySupplier();
   const provsOrdered = Object.keys(bySup).sort((a,b)=>a.localeCompare(b,'es'));
@@ -542,14 +557,6 @@ function renderModal(){
     html += `</ul></div>`;
   });
   document.getElementById('modalContent').innerHTML = html || `<p>No hay productos seleccionados.</p>`;
-
-  let printHtml = `<h2>Pedido Sixto Café</h2><div>${fechaHoy()}</div>`;
-  provsOrdered.forEach(prov=>{
-    printHtml += `<h4>${prov}</h4><ul>`;
-    bySup[prov].forEach(name=> printHtml += `<li>${name}</li>`);
-    printHtml += `</ul>`;
-  });
-  document.getElementById('printArea').innerHTML = printHtml;
 }
 
 function textoPlano(){
@@ -586,16 +593,39 @@ document.getElementById('modalOverlay').addEventListener('click', e=>{
   if(e.target.id === 'modalOverlay') document.getElementById('modalOverlay').classList.remove('open');
 });
 
-document.getElementById('sendBtn').addEventListener('click', ()=>{
+function enviarPorMailto(){
   const txt = textoPlano();
   const subject = encodeURIComponent(`Pedido Sixto Café — ${fechaHoy()}`);
   const body = encodeURIComponent(txt);
   window.location.href = `mailto:${EMAIL_DESTINO}?subject=${subject}&body=${body}`;
   showToast('Abriendo tu correo con el pedido listo para enviar...');
-});
+}
 
-document.getElementById('printBtn').addEventListener('click', ()=>{
-  window.print();
+document.getElementById('sendBtn').addEventListener('click', ()=>{
+  const sendBtn = document.getElementById('sendBtn');
+  if(!window.emailjs){
+    showToast('EmailJS no cargó (revisa tu conexión), abriendo tu correo...');
+    enviarPorMailto();
+    return;
+  }
+  sendBtn.disabled = true;
+  const textoOriginal = sendBtn.textContent;
+  sendBtn.textContent = "Enviando...";
+  emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+    fecha: fechaHoy(),
+    pedido: buildOrderEmailHTML()
+  }).then(()=>{
+    showToast('Pedido enviado ✓');
+    sendBtn.textContent = textoOriginal;
+    sendBtn.disabled = false;
+  }).catch((err)=>{
+    console.error('EmailJS error', err);
+    const motivo = (err && (err.text || err.message)) ? (err.text || err.message) : 'error desconocido';
+    showToast(`No se pudo enviar (${motivo}), abriendo tu correo...`);
+    sendBtn.textContent = textoOriginal;
+    sendBtn.disabled = false;
+    enviarPorMailto();
+  });
 });
 
 document.getElementById('clearBtn').addEventListener('click', ()=>{
